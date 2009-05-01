@@ -146,13 +146,15 @@ class Flexihash
 	/**
 	 * Looks up the target for the given resource.
 	 * @param string $resource
+	 * @param int $replicas Number of wanted replicas, if greater than 1, the method will randomly
+	 *                      return one of the $replicas number of target selected for the resource.
 	 * @return string
 	 */
-	public function lookup($resource)
+	public function lookup($resource, $replicas = 1)
 	{
-		$targets = $this->lookupList($resource, 1);
+		$targets = $this->lookupList($resource, $replicas);
 		if (empty($targets)) throw new Flexihash_Exception('No targets exist');
-		return $targets[0];
+		return $targets[array_rand($targets)];
 	}
 
 	/**
