@@ -64,6 +64,13 @@ class Flexihash
 		if (!empty($replicas)) $this->_replicas = $replicas;
 	}
 
+	public function __sleep()
+	{
+		$this->compile();
+		return array('_replicas', '_hasher', '_targetCount', '_positionToTarget',
+		 	'_targetToPositions', '_positions', '_positionCount');
+	}
+
 	/**
 	 * Add a target.
 	 * @param string $target

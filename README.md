@@ -11,8 +11,18 @@ Usage Example
 
 $hash = new Flexihash();
 
-// bulk add
-$hash->addTargets(array('cache-1', 'cache-2', 'cache-3'));
+if ($data = $cache->get('myhash'))
+{
+    $hash = unserialize($data);
+}
+else
+{
+    // bulk add
+    $hash->addTargets(array('cache-1', 'cache-2', 'cache-3'));
+
+    // save costly initialized hash for later use
+    $cache->set('myhash', serialize($hash));
+}
 
 // simple lookup
 $hash->lookup('object-a'); // "cache-1"
