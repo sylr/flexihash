@@ -42,10 +42,16 @@ class Flexihash
 	private $_targetToPositions = array();
 
 	/**
-	 * Whether the internal map of positions to targets is already sorted.
-	 * @var boolean
+	 * Sorted array of positions
+	 * @var array [ positions, positions, ...]
 	 */
-	private $_positionToTargetSorted = false;
+	private $_positions = null;
+
+	/**
+	 * Internal counter for positions
+	 * @var int
+	 */
+	private $_positionCount = 0;
 
 	/**
 	 * Constructor
@@ -81,7 +87,7 @@ class Flexihash
 			$this->_targetToPositions[$target] []= $position; // target removal
 		}
 
-		$this->_positionToTargetSorted = false;
+		$this->_positions = null;
 		$this->_targetCount++;
 
 		return $this;
@@ -122,6 +128,7 @@ class Flexihash
 
 		unset($this->_targetToPositions[$target]);
 
+		$this->_positions = null;
 		$this->_targetCount--;
 
 		return $this;
@@ -161,61 +168,66 @@ class Flexihash
 		if (!$requestedCount)
 			throw new Flexihash_Exception('Invalid count requested');
 
-		// handle no targets
-		if (empty($this->_positionToTarget))
-			return array();
-
-		// optimize single target
-		if ($this->_targetCount == 1)
-			return array_unique(array_values($this->_positionToTarget));
+		switch ($this->_targetCount)
+		{
+			// handle no targets
+			case 0: return array();
+			// optimize single target
+			case 1: return array_unique(array_values($this->_positionToTarget));
+		}
 
 		// hash resource to a position
 		$resourcePosition = $this->_hasher->hash($resource);
 
-		$results = array();
-		$collect = false;
+		$this->compile();
+		$results   = array();
+		$positions = $this->_positions;
+		$high      = $this->_positionCount - 1;
+		$low       = 0;
+		$notfound  = false;
 
-		$this->_sortPositionTargets();
-
-		// search values above the resourcePosition
-		foreach ($this->_positionToTarget as $key => $value)
+		// inary search of the first position greater than resource position
+		while ($high >= $low || $notfound = true)
 		{
-			// start collecting targets after passing resource position
-			if (!$collect && $key > $resourcePosition)
-			{
-				$collect = true;
-			}
+			$probe = (int)floor(($high + $low) / 2);
 
-			// only collect the first instance of any target
-			if ($collect && !in_array($value, $results))
+			if (false === $notfound && $positions[$probe] <= $resourcePosition)
 			{
-				$results []= $value;
+				$low = $probe + 1;
 			}
-
-			// return when enough results, or list exhausted
-			if (count($results) == $requestedCount || count($results) == $this->_targetCount)
+			elseif (0 === $probe || $positions[$probe - 1] < $resourcePosition || true === $notfound)
 			{
-				return $results;
+				if ($notfound)
+				{
+					// if not found is true, it means binary search failed to find any position greater
+					// than ressource position, in this case, the last position is the bigest lower
+					// position and first position is the next one after cycle
+					$probe = 0;
+				}
+
+				$results[] = $this->_positionToTarget[$positions[$probe]];
+
+				if ($requestedCount > 1)
+				{
+					for ($i = $requestedCount - 1; $i > 0; $i--)
+					{
+						if (++$probe > $this->_positionCount - 1)
+						{
+							$probe = 0; // cycle
+						}
+						$results[] = $this->_positionToTarget[$positions[$probe]];
+					}
+				}
+
+				break;
+			}
+			else
+			{
+				$high = $probe - 1;
 			}
 		}
 
-		// loop to start - search values below the resourcePosition
-		foreach ($this->_positionToTarget as $key => $value)
-		{
-			if (!in_array($value, $results))
-			{
-				$results []= $value;
-			}
-
-			// return when enough results, or list exhausted
-			if (count($results) == $requestedCount || count($results) == $this->_targetCount)
-			{
-				return $results;
-			}
-		}
-
-		// return results after iterating through both "parts"
-		return $results;
+		return array_unique($results);
 	}
 
 	public function __toString()
@@ -227,19 +239,16 @@ class Flexihash
 		);
 	}
 
-	// ----------------------------------------
-	// private methods
-
 	/**
-	 * Sorts the internal mapping (positions to targets) by position
+	 * Sorts the internal positions and pre-count them
 	 */
-	private function _sortPositionTargets()
+	public function compile()
 	{
-		// sort by key (position) if not already
-		if (!$this->_positionToTargetSorted)
+		if (null === $this->_positions)
 		{
-			ksort($this->_positionToTarget, SORT_REGULAR);
-			$this->_positionToTargetSorted = true;
+			ksort($this->_positionToTarget);
+			$this->_positions = array_keys($this->_positionToTarget);
+			$this->_positionCount = count($this->_positions);
 		}
 	}
 
