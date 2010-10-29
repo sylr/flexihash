@@ -191,6 +191,10 @@ class Flexihash
 			{
 				$results []= $value;
 			}
+			else
+			{
+				continue;
+			}
 
 			// return when enough results, or list exhausted
 			if (count($results) == $requestedCount || count($results) == $this->_targetCount)
